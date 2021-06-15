@@ -1,0 +1,15 @@
+---
+- hosts: w10
+  tasks:
+
+    - name: "Instalar python"
+      win_shell: "choco install python --yes --no-progress --limit-output --timeout 2700"
+
+    - name: "Instalar pip"
+      win_shell: "$url = 'https://bootstrap.pypa.io/get-pip.py'; $file = 'get-pip.py'; (New-Object -TypeName System.Net.WebClient).DownloadFile($url, $file); python get-pip.py"
+
+    - name: "Instalar curl"
+      win_shell: "choco install curl --yes --no-progress --limit-output --timeout 2700"
+
+    - name: "Instalar git"
+      win_shell: "choco install git --yes --no-progress --limit-output --timeout 2700"

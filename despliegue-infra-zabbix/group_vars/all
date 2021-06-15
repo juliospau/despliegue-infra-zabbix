@@ -1,0 +1,33 @@
+---
+ansible_user: 'vagrant'
+zabbix_link_templates_default:
+  - "Linux by Zabbix agent active"
+
+zabbix_host_groups:
+  - "Templates/Operating systems"
+
+zabbix_link_templates:
+  - "{{ zabbix_link_templates_default }}"
+
+zabbix_version: 5.2
+zabbix_url: 'http://172.28.128.1'
+zabbix_install_pip_packages: true
+zabbix_agent_become_on_localhost: False
+zabbix_api_user: 'Admin'
+zabbix_api_pass: 'zabbix'
+zabbix_api_create_hosts: true
+zabbix_api_create_hostgroup: present
+#zabbix_proxy: 'PROXY SERVER'
+#zabbix_agent_server: "{{ hostvars[zabbix_proxy]['ansible_host'] }}"
+#zabbix_agent_serveractive: "{{ hostvars[zabbix_proxy]['ansible_host'] }}"
+
+zabbix_agent_interfaces:
+  - type: "1"
+    main: "1"
+    useip: "1"
+    ip: "{{ ansible_enp0s8.ipv4.address }}"
+    dns: "{{ ansible_fqdn }}"
+    port: "10050"
+
+zabbix_macros:
+  - "{{ zabbix_macros_append if zabbix_macros_append is defined else [] }}"

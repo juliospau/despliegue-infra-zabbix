@@ -1,0 +1,104 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.customize ["modifyvm", :id, "--memory", 2048]  # Para toda máquina virtual, se establecen 2GB de RAM y la utilización un sólo núcleo de CPU
+    vb.customize ["modifyvm", :id, "--cpus", 1]
+  end
+
+  # Máquina de Windows 10
+  config.vm.define "w10" do |w10|
+  
+  w10.vm.box = "w10-official"
+  w10.vm.communicator = "winrm"
+  w10.winrm.username = "IEUser"
+  w10.winrm.password = "Passw0rd!"
+  w10.vm.boot_timeout = 600
+
+  w10.vm.network "private_network", type: "dhcp"
+  w10.vm.network "forwarded_port", id: "winrm", host: 22010, guest: 5985
+
+  # Se habilita WINRM:
+
+  w10.vm.provision "shell",
+    	binary: true,
+    	privileged: false,
+    	inline: <<-SHELL
+
+    	$url = "https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1";
+    	$file = "$env:temp\\ConfigureRemotingForAnsible.ps1";
+    	(New-Object -TypeName System.Net.WebClient).DownloadFile($url, $file);
+    	powershell.exe -ExecutionPolicy ByPass -File $file;
+        netsh advfirewall firewall add rule name="WinRM-HTTP" dir=in localport=5985 protocol=TCP action=allow; # Se permite la conexión al puerto para WinRM
+        winrm set winrm/config/winrs '@{MaxMemoryPerShellMB="1024"}'
+	New-NetFirewallRule -DisplayName "Allow inbound 32650" -Direction Inbound -Protocol TCP -Action Allow -LocalPort 32650 -Profile Domain
+	New-NetFirewallRule -DisplayName "Allow inbound 32650" -Direction Inbound -Protocol TCP -Action Allow -LocalPort 32650 -Profile Any
+	choco install -y zabbix-agent
+
+	$url2 = "https://raw.githubusercontent.com/juliospau/zabbix-conf/main/zabbix.ps1";
+    	$file2 = "$env:temp\\zabbix.ps1";
+    	(New-Object -TypeName System.Net.WebClient).DownloadFile($url2, $file2);
+    	powershell.exe -ExecutionPolicy ByPass -File $file2;
+
+	SHELL
+	#w10.vm.provision "ansible" do |ansible|
+	#	ansible.playbook = "zabbix-agent-windows.yml",
+	#	ansible.extra_vars = {
+	#		ansible_connection: "winrm",
+        #		ansible_winrm_scheme: "http",
+	#		ansible_user: "IEUser",
+	#		ansible_password: "Passw0rd!",
+	#		ansible_winrm_server_cert_validation: "ignore",
+	#		elevated_user: "Administrator",
+	#		elevated_password: "Passw0rd!"
+    	#}
+	#end
+
+
+
+  end
+
+  config.vm.define "ubu18" do |ubu18|
+
+  	ubu18.vm.box = "ubuntu/bionic64"
+  	ubu18.vm.hostname = "cliente-ubuntu"
+  	ubu18.vm.network "private_network", type: "dhcp"
+	ubu18.vm.provision "shell",
+    		binary: true,
+    		privileged: false,
+    		inline: <<-SHELL
+			sudo apt update; sudo apt install -y python3-pip
+		SHELL
+    
+	ubu18.vm.provision "ansible" do |ansible|
+        	ansible.playbook = "zabbix-agent.yml"
+		ansible.extra_vars = { ansible_python_interpreter: "/usr/bin/python3" }
+        end
+
+  end
+
+  config.vm.define "cen7" do |cen7|
+  	cen7.vm.box = "generic/centos7"
+        cen7.vm.hostname = "cliente-centos"
+ 	cen7.vm.network "private_network", type: "dhcp"
+        cen7.vm.provision "shell",
+    	binary: true,
+   	privileged: true,
+  	inline: <<-SHELL
+		/sbin/ip link set eth1 down
+		/sbin/ip link set eth1 name enp0s8
+		/sbin/ip link set enp0s8 up
+ 		curl https://sh.rustup.rs -sSf | sh
+		yum install -y python3 python3-pip gcc libffi-devel python3-devel openssl-devel
+		pip3 install --upgrade pip
+		pip3 install wheel setuptools setuptools-rust cryptography
+	SHELL
+    	cen7.vm.provision "ansible" do |ansible|
+         ansible.playbook = "zabbix-agent.yml"
+	 ansible.extra_vars = { ansible_python_interpreter:"/usr/bin/python3", become: "yes" }
+       end
+
+	end
+end

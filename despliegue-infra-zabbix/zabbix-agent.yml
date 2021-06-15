@@ -1,0 +1,72 @@
+---
+- hosts: all
+  become: yes
+  collections:
+    - community.zabbix
+  roles:
+    - role: zabbix_agent
+  tasks:
+    - name: "Instalación de paquetes necesarios en Ubuntu"
+      apt:
+        pkg:
+        - ca-certificates
+        - curl
+        - python3
+        - python3-pip
+        - git
+      when: ansible_facts['os_family'] == "Ubuntu"
+
+    - name: "Instalación de paquetes necesarios en CentOS"
+      apt:
+        pkg:
+        - ca-certificates
+        - curl
+        - python3
+        - python3-pip
+        - git
+      when: ansible_facts['os_family'] == "CentOS"
+
+    - name: "Instalación de paquetes necesarios con Pip"
+      pip:
+        name:
+          - ansible
+          - netaddr
+          - zabbix-api
+
+  post_tasks:
+    - name: "Creación de /var/lib/zabbix"
+      file:
+        path: /var/lib/zabbix
+        owner: zabbix
+        group: zabbix
+        state: directory
+
+    - name: "Configuración"
+      copy:
+        content: |
+          [client]
+          user='zabbix'
+          password='zabbix'
+          host={{ ansible_default_ipv4.address }}
+        dest: /var/lib/zabbix/.my.cnf
+
+    - name: "Configuración básica de conexión"
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        line: Server=172.28.128.1
+
+    - name: "Configuración básica de conexión - ServerActive"
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        line: ServerActive=172.28.128.1:10051
+
+    - name: "Permisos sobre archivo de log"
+      file:
+        path: /var/log/zabbix/zabbix_agentd.log
+        state: file
+        owner: zabbix
+        group: zabbix
+        mode: 0777
+
+    - name: "Reiniciar agente de Zabbix"
+      service: name=zabbix-agent state=restarted
